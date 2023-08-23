@@ -9,6 +9,12 @@ export const initialState = {
 
 export const reducers = (state = initialState, action) => {
   switch (action.type) {
+    // Set current user
+    case "USER":
+      return Object.assign({}, state, {
+        user: action.value.user,
+      });
+    
     // Updates the client user model data and stores the page
     case "USER_OFFSET":
       return Object.assign({}, state, {

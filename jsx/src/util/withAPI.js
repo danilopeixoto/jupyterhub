@@ -2,6 +2,8 @@ import { withProps } from "recompose";
 import { jhapiRequest } from "./jhapiUtil";
 
 const withAPI = withProps(() => ({
+  getUser: () =>
+    jhapiRequest("/user", "GET").then((data) => data.json()),
   updateUsers: (offset, limit, name_filter) =>
     jhapiRequest(
       `/users?include_stopped_servers&offset=${offset}&limit=${limit}&name_filter=${

@@ -71,6 +71,15 @@ const ServerDashboard = (props) => {
     history,
   } = props;
 
+  const setUser = (user) => {
+    dispatch({
+      type: "USER",
+      value: {
+        user: user,
+      },
+    });
+  };
+
   const dispatchPageUpdate = (data, page) => {
     dispatch({
       type: "USER_PAGE",
@@ -98,6 +107,12 @@ const ServerDashboard = (props) => {
       },
     });
   };
+
+  useEffect(() => {
+    getUser()
+      .then((user) => setUser(user))
+      .catch((err) => setErrorAlert("Failed to get current user."));
+  });
 
   useEffect(() => {
     updateUsers(offset, limit, name_filter)
@@ -582,6 +597,7 @@ const ServerDashboard = (props) => {
 
 ServerDashboard.propTypes = {
   user_data: PropTypes.array,
+  getUser: PropTypes.func,
   updateUsers: PropTypes.func,
   shutdownHub: PropTypes.func,
   startServer: PropTypes.func,

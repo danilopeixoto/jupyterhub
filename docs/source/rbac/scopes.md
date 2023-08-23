@@ -144,6 +144,11 @@ and access _to_ the admin UI are separated.
 For example, it generally doesn't make sense to grant
 `admin-ui` without at least `list:users` for at least some subset of users.
 
+:::{versionadded} 4.0
+The UI components on the admin page are rendered dynamically based on the scopes
+granted to the user. For example, users with the `admin-ui` scope will see the
+"Shutdown Hub" button if they also hold the `shutdown` scope.
+
 For example:
 
 ```python
