@@ -19,7 +19,9 @@ import { FaSort, FaSortUp, FaSortDown } from "react-icons/fa";
 
 import "./server-dashboard.css";
 import { timeSince } from "../../util/timeSince";
+import { parseScopes } from "../../util/scopes";
 import PaginationFooter from "../PaginationFooter/PaginationFooter";
+import ProtectedComponent from "../ProtectedComponent/ProtectedComponent";
 
 const RowListItem = ({ text }) => (
   <span className="server-dashboard-row-list-item">{text}</span>
@@ -110,7 +112,10 @@ const ServerDashboard = (props) => {
 
   useEffect(() => {
     getUser()
-      .then((user) => setUser(user))
+      .then((user) => {
+        user.scopes = user.scopes ? parseScopes(user.scopes) : [];
+        return user;
+      })
       .catch((err) => setErrorAlert("Failed to get current user."));
   });
 
@@ -244,23 +249,21 @@ const ServerDashboard = (props) => {
 
   const EditUserCell = ({ user }) => {
     return (
-      <td>
-        <button
-          className="btn btn-primary btn-xs"
-          style={{ marginRight: 20 }}
-          onClick={() =>
-            history.push({
-              pathname: "/edit-user",
-              state: {
-                username: user.name,
-                has_admin: user.admin,
-              },
-            })
-          }
-        >
-          Edit User
-        </button>
-      </td>
+      <button
+        className="btn btn-primary btn-xs"
+        style={{ marginRight: 20 }}
+        onClick={() =>
+          history.push({
+            pathname: "/edit-user",
+            state: {
+              username: user.name,
+              has_admin: user.admin,
+            },
+          })
+        }
+      >
+        Edit User
+      </button>
     );
   };
 
@@ -349,13 +352,25 @@ const ServerDashboard = (props) => {
           {server.last_activity ? timeSince(server.last_activity) : "Never"}
         </td>
         <td data-testid="user-row-server-activity" className="actions">
-          <StartServerButton server={server} user={user} />
-          <StopServerButton server={server} user={user} />
-          <DeleteServerButton server={server} user={user} />
-          <AccessServerButton server={server} />
-          <SpawnPageButton server={server} user={user} />
+          <ProtectedComponent needsScope={["servers"]}>
+            <StartServerButton server={server} user={user} />
+            <StopServerButton server={server} user={user} />
+          </ProtectedComponent>
+          <ProtectedComponent needsScope={["delete:servers"]}>
+            <DeleteServerButton server={server} user={user} />
+          </ProtectedComponent>
+          <ProtectedComponent needsScope={["access:servers"]}>
+            <AccessServerButton server={server} />
+          </ProtectedComponent>
+          <ProtectedComponent needsScope={["servers"]}>
+            <SpawnPageButton server={server} user={user} />
+          </ProtectedComponent>
         </td>
-        <EditUserCell user={user} />
+        <td>
+          <ProtectedComponent needsScope={["admin:users"]}>
+            <EditUserCell user={user} />
+          </ProtectedComponent>
+        </td>
       </tr>,
       <tr key={`${userServerName}-detail`}>
         <td
@@ -413,7 +428,7 @@ const ServerDashboard = (props) => {
       )}
       <div className="server-dashboard-container">
         <Row>
-          <Col md={4}>
+          <Col md={4} style={{ marginBottom: 15 }}>
             <FormControl
               type="text"
               name="user_search"
@@ -425,7 +440,12 @@ const ServerDashboard = (props) => {
           </Col>
 
           <Col md="auto" style={{ float: "right", margin: 15 }}>
-            <Link to="/groups">{"> Manage Groups"}</Link>
+            <ProtectedComponent needsScope={["admin:groups"]}>
+              <Link to="/groups">
+                <i aria-hidden="true" class="fa fa-group"></i>
+                {" "}Manage Groups
+              </Link>
+            </ProtectedComponent>
           </Col>
         </Row>
         <table className="table table-bordered table-hover">
@@ -477,104 +497,110 @@ const ServerDashboard = (props) => {
           <tbody>
             <tr className="noborder">
               <td>
-                <Link to="/add-users">
-                  <Button variant="light" className="add-users-button">
-                    Add Users
-                  </Button>
-                </Link>
+                <ProtectedComponent needsScope={["admin:users"]}>
+                  <Link to="/add-users">
+                    <Button variant="light" className="add-users-button">
+                      Add Users
+                    </Button>
+                  </Link>
+                </ProtectedComponent>
               </td>
               <td></td>
               <td></td>
               <td>
-                {/* Start all servers */}
-                <Button
-                  variant="primary"
-                  className="start-all"
-                  data-testid="start-all"
-                  onClick={() => {
-                    Promise.all(startAll(user_data.map((e) => e.name)))
-                      .then((res) => {
-                        let failedServers = res.filter((e) => !e.ok);
-                        if (failedServers.length > 0) {
-                          setErrorAlert(
-                            `Failed to start ${failedServers.length} ${
-                              failedServers.length > 1 ? "servers" : "server"
-                            }. ${
-                              failedServers.length > 1 ? "Are they " : "Is it "
-                            } already running?`,
-                          );
-                        }
-                        return res;
-                      })
-                      .then((res) => {
-                        updateUsers(...slice)
-                          .then((data) => {
-                            dispatchPageUpdate(
-                              data.items,
-                              data._pagination,
-                              name_filter,
+                <ProtectedComponent needsScope={["admin:servers"]}>
+                  {/* Start all servers */}
+                  <Button
+                    variant="primary"
+                    className="start-all"
+                    data-testid="start-all"
+                    onClick={() => {
+                      Promise.all(startAll(user_data.map((e) => e.name)))
+                        .then((res) => {
+                          let failedServers = res.filter((e) => !e.ok);
+                          if (failedServers.length > 0) {
+                            setErrorAlert(
+                              `Failed to start ${failedServers.length} ${
+                                failedServers.length > 1 ? "servers" : "server"
+                              }. ${
+                                failedServers.length > 1 ? "Are they " : "Is it "
+                              } already running?`,
                             );
-                          })
-                          .catch(() =>
-                            setErrorAlert(`Failed to update users list.`),
-                          );
-                        return res;
-                      })
-                      .catch(() => setErrorAlert(`Failed to start servers.`));
-                  }}
-                >
-                  Start All
-                </Button>
-                <span> </span>
-                {/* Stop all servers */}
-                <Button
-                  variant="danger"
-                  className="stop-all"
-                  data-testid="stop-all"
-                  onClick={() => {
-                    Promise.all(stopAll(user_data.map((e) => e.name)))
-                      .then((res) => {
-                        let failedServers = res.filter((e) => !e.ok);
-                        if (failedServers.length > 0) {
-                          setErrorAlert(
-                            `Failed to stop ${failedServers.length} ${
-                              failedServers.length > 1 ? "servers" : "server"
-                            }. ${
-                              failedServers.length > 1 ? "Are they " : "Is it "
-                            } already stopped?`,
-                          );
-                        }
-                        return res;
-                      })
-                      .then((res) => {
-                        updateUsers(...slice)
-                          .then((data) => {
-                            dispatchPageUpdate(
-                              data.items,
-                              data._pagination,
-                              name_filter,
+                          }
+                          return res;
+                        })
+                        .then((res) => {
+                          updateUsers(...slice)
+                            .then((data) => {
+                              dispatchPageUpdate(
+                                data.items,
+                                data._pagination,
+                                name_filter,
+                              );
+                            })
+                            .catch(() =>
+                              setErrorAlert(`Failed to update users list.`),
                             );
-                          })
-                          .catch(() =>
-                            setErrorAlert(`Failed to update users list.`),
-                          );
-                        return res;
-                      })
-                      .catch(() => setErrorAlert(`Failed to stop servers.`));
-                  }}
-                >
-                  Stop All
-                </Button>
+                          return res;
+                        })
+                        .catch(() => setErrorAlert(`Failed to start servers.`));
+                    }}
+                  >
+                    Start All
+                  </Button>
+                  <span> </span>
+                  {/* Stop all servers */}
+                  <Button
+                    variant="danger"
+                    className="stop-all"
+                    data-testid="stop-all"
+                    onClick={() => {
+                      Promise.all(stopAll(user_data.map((e) => e.name)))
+                        .then((res) => {
+                          let failedServers = res.filter((e) => !e.ok);
+                          if (failedServers.length > 0) {
+                            setErrorAlert(
+                              `Failed to stop ${failedServers.length} ${
+                                failedServers.length > 1 ? "servers" : "server"
+                              }. ${
+                                failedServers.length > 1 ? "Are they " : "Is it "
+                              } already stopped?`,
+                            );
+                          }
+                          return res;
+                        })
+                        .then((res) => {
+                          updateUsers(...slice)
+                            .then((data) => {
+                              dispatchPageUpdate(
+                                data.items,
+                                data._pagination,
+                                name_filter,
+                              );
+                            })
+                            .catch(() =>
+                              setErrorAlert(`Failed to update users list.`),
+                            );
+                          return res;
+                        })
+                        .catch(() => setErrorAlert(`Failed to stop servers.`));
+                    }}
+                  >
+                    Stop All
+                  </Button>
+                </ProtectedComponent>
               </td>
               <td>
                 {/* Shutdown Jupyterhub */}
-                <Button
-                  variant="danger"
-                  id="shutdown-button"
-                  onClick={shutdownHub}
-                >
-                  Shutdown Hub
-                </Button>
+                <ProtectedComponent needsScope={["shutdown"]}>
+                  <Button
+                    variant="danger"
+                    id="shutdown-button"
+                    onClick={shutdownHub}
+                  >
+                    Shutdown Hub
+                  </Button>
+                </ProtectedComponent>
               </td>
               <td></td>
             </tr>
